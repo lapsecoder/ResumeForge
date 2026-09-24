@@ -1,0 +1,26 @@
+Ada Lovelace
+Senior Software Engineer
+ada@example.com | London, UK
+
+Summary
+Software engineer experienced with Python, PostgreSQL, and large-scale data pipelines.
+
+Experience
+
+Analytical Engines | Engineer | 2019 - Present
+- Built a billing service used by thousands of users.
+- Reduced deployment time by 30%.
+
+Education
+
+MIT - B.S. Computer Science
+
+Skills
+
+Python, PostgreSQL, Docker, PyTorch
+
+Projects
+
+Python Data Pipeline
+Built a Python data pipeline that processes millions of rows for analytics dashboards.
+Technologies: Python, PyTorch

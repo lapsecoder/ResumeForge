@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* Phase 7D — resume preview and print/PDF styles. */
+
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+.resume-paper {
+  width: 210mm;
+  min-height: 297mm;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #ffffff;
+  padding: 14mm 15mm;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+}
+
+/* The print root is mounted in <body> and hidden on screen. Printing shows
+   only this root, so the browser produces the resume alone with no app
+   chrome and no blank trailing pages. */
+.resume-print-root {
+  display: none;
+}
+
+@media print {
+  body > * {
+    display: none !important;
+  }
+
+  body > .resume-print-root {
+    display: block !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .resume-print-root .resume-paper {
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .resume-entry {
+    break-inside: avoid;
+  }
+
+  .resume-heading {
+    break-after: avoid;
+  }
+}

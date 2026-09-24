@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Testing
+coverage/
+htmlcov/
+playwright-report/
+test-results/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ML workspace artifacts
+backend/ml/artifacts/
+backend/ml/data/
+backend/ml/cache/
+*.parquet
+*.npy
+*.joblib
+*.pkl
+*.pt
+*.bin
