@@ -325,7 +325,8 @@ persistence.
 POST /api/v1/matching/semantic
   { resume: <Resume>, job: <JobDescription> }
   → build PII-free text units for both sides
-  → embed locally (sentence-transformers, lazy-loaded, cached per process)
+  → embed locally (bundled ONNX model via onnxruntime, lazy, cached per
+    process)
   → per-category + item-level normalized cosine similarity
   → transient SemanticMatchResult → nothing retained
 ```
@@ -333,12 +334,14 @@ POST /api/v1/matching/semantic
 ### Model, device, lifecycle
 
 - Default model **`sentence-transformers/all-MiniLM-L6-v2`** (384-dim,
-  Apache-2.0, ~90 MB, no API key), overridable via `SEMANTIC_MODEL_NAME` /
-  `SEMANTIC_MODEL_DIMENSION` in `.env`.
-- Weights are downloaded once into the local Hugging Face cache; the repo
-  contains no model files.
-- The library is imported lazily on the first request; the model loads **once
-  per process** (`cuda` if available, else `cpu`) and is reused. Thresholds
+  Apache-2.0, no API key), exported to a bundled **quantised ONNX**
+  checkpoint (`app/semantic_matching/models/`, ~23 MB total) that ships with
+  the repo and runs via `onnxruntime` on CPU. Overridable via
+  `SEMANTIC_MODEL_NAME` / `SEMANTIC_MODEL_DIMENSION` in `.env`.
+- No runtime download: tokenizer + weights are in-repo; nothing is fetched
+  from Hugging Face at install or request time.
+- The session is built lazily on the first request; the model loads **once
+  per process** (CPU only) and is reused. Thresholds
   (`SEMANTIC_HIGH_SIMILARITY_THRESHOLD` default `0.65`,
   `SEMANTIC_MODERATE_SIMILARITY_THRESHOLD` default `0.40`) drive the result
   buckets (`matched_semantic_items` / `related_items` / `low_similarity_items`).
@@ -374,7 +377,7 @@ app/semantic_matching/
 ├── __init__.py        # exports compute_semantic_match + SemanticMatchResult
 ├── config.py          # SemanticSettings (SEMANTIC_* env), thresholds
 ├── model.py           # EmbeddingProvider + LocalSentenceTransformerProvider
-│                      #   lazy load, device pick, SemanticError hierarchy
+│                      #   lazy ONNX session, CPU, SemanticError hierarchy
 ├── embedder.py        # batch-embeds text units via a provider
 ├── similarity.py      # pure-Python cosine / normalized similarity / level
 ├── text_builder.py    # deterministic PII-free unit building (resume + JD)
@@ -387,28 +390,27 @@ app/api/v1/matching.py # POST /api/v1/matching/semantic
 
 - Semantic similarity is a **relatedness signal**, not a requirement-evidence
   check — use `/score` (or `/hybrid`, which keeps deterministic authority).
-- Embeddings are computed locally; the **real-model integration test cannot
-  run on this machine** (see "Real-model verification" below).
+- Embeddings are computed locally with the bundled ONNX model (CPU only).
 - Spoken languages are handled by the deterministic matcher, not the semantic
   layer.
-- First request downloads ~90 MB of public weights if not cached.
+- The semantic layer needs no network and downloads nothing.
 
 ### Real-model verification (one-time)
 
 ```bash
-# Python 3.13 note: numpy has no 3.13 wheel for the pinned-era versions; build
-# toolchain needed, or run this on Python ≤ 3.12 where wheels exist.
-pip install -e ".[dev]"          # installs sentence-transformers + torch-cpu
+# Python 3.13 note: numpy needs 3.13 wheels (available for recent versions);
+# the onnxruntime + tokenizers wheels install on 3.11–3.13 directly.
+pip install -e ".[dev]"          # installs onnxruntime + tokenizers (CPU)
 uvicorn app.main:app --reload
 # then POST a parsed resume+JD to /api/v1/matching/semantic and check
-# metadata: { model, device: "cuda"|"cpu" }
+# metadata: { model, device: "cpu", source: "bundled in-app model (no runtime download)" }
 pytest -m integration -q         # real-model run, skips if blocked
 ```
 
-On this development machine the OS-level Windows Application Control policy
-blocks numpy's native `numpy.random._sfc64` DLL, so the real model cannot load
-here; the integration test skips cleanly. No code path degrades — only the
-offline fake-provider tests cover the service/API on this machine.
+The bundled ONNX model is CPU-only and deterministic; on constrained machines
+the integration test skips cleanly if the native DLLs are blocked. No code
+path degrades — only the offline fake-provider tests cover the service/API in
+that case.
 
 ## Hybrid Matching (Phase 5C)
 

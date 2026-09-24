@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.semantic_matching.config import (
     MODEL_LICENSE,
+    MODEL_SOURCE_DEFAULT,
     SEMANTIC_IMPLEMENTATION_VERSION,
 )
 from app.semantic_matching.similarity import SimilarityLevel
@@ -33,7 +34,7 @@ class SemanticMatchMetadata(BaseModel):
     method: str = "local-semantic-embedding"
     model_name: str
     model_version: str
-    model_source: str = "local Hugging Face cache"
+    model_source: str = MODEL_SOURCE_DEFAULT
     model_license: str = MODEL_LICENSE
     model_dimension: int
     device: str

@@ -19,7 +19,9 @@ dependencies = [
     "pypdf>=4.0",
     "python-docx>=1.1",
     "python-multipart>=0.0.9",
-    "sentence-transformers>=2.7",
+    "onnxruntime>=1.20",
+    "tokenizers>=0.18",
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +37,8 @@ ml = [
     "datasets>=2.20",
     "matplotlib>=3.8",
     "scikit-learn>=1.4",
+    "scipy>=1.10",
+    "sentence-transformers>=2.7",
 ]
 
 [tool.setuptools.packages.find]
@@ -66,6 +70,8 @@ module = [
     "transformers.*",
     "tokenizers",
     "tokenizers.*",
+    "onnxruntime",
+    "onnxruntime.*",
     "numpy",
     "numpy.*",
     "pandas",

@@ -21,8 +21,9 @@ The entire project MUST operate at zero monetary cost.
   tiers, treat these as non-permitted unless the cost is literally ₹0 forever.
 - Prefer open-source, local, and genuinely free solutions.
 - Approved tooling: PostgreSQL + pgvector, Redis, S3-compatible/MinIO object
-  storage, sentence-transformers (local embeddings), Ollama (local LLM),
-  open-source Python NLP libraries (pdfplumber, PyMuPDF, python-docx, spaCy).
+  storage, ONNX Runtime + bundled ONNX sentence-embedding models (local
+  embeddings), Ollama (local LLM), open-source Python NLP libraries
+  (pdfplumber, PyMuPDF, python-docx, spaCy).
 - Any new dependency MUST be free (license + runtime cost). Flag anything that
   could incur cost in a PR description.
 - Never add a dependency or service secretly. Call out cost implications.
@@ -105,7 +106,8 @@ docs/       Architecture and decision documentation
 
 - Database: PostgreSQL + pgvector (self-hosted or free managed tier only).
 - Object storage: S3-compatible (MinIO locally / free tier only).
-- Embeddings: local sentence-transformers (no external API).
+- Embeddings: local ONNX Runtime + bundled ONNX model files (no external API,
+  no runtime download).
 - LLM generation: Ollama (local). No paid model API.
 - Everything runs in Docker; `docker-compose.yml` orchestrates dev services.
 

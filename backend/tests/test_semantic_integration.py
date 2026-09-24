@@ -1,7 +1,7 @@
-r"""Optional integration test running the REAL local embedding model.
+r"""Optional integration test running the REAL bundled embedding model.
 
-Skipped when sentence-transformers is missing or cannot be used on the current
-machine (e.g. OS policies blocking native DLLs). Run manually:
+Skipped when onnxruntime or tokenizers is missing or cannot be used on the
+current machine (e.g. OS policies blocking native DLLs). Run manually:
 
     $env:PYTHONIOENCODING="utf-8"
     & .venv\Scripts\python.exe -m pytest tests/test_semantic_integration.py
@@ -15,10 +15,11 @@ from __future__ import annotations
 import pytest
 
 try:
-    import sentence_transformers  # noqa: F401, PLC0415
+    import onnxruntime  # noqa: F401, PLC0415
+    import tokenizers  # noqa: F401, PLC0415
 except Exception as exc:  # missing package, blocked native DLL, etc.
     pytest.skip(
-        f"sentence-transformers is unavailable on this machine: {exc}",
+        f"onnxruntime/tokenizers is unavailable on this machine: {exc}",
         allow_module_level=True,
     )
 
@@ -57,7 +58,7 @@ def test_default_model_produces_finite_384_dim_vectors() -> None:
     assert all(all(v == v for v in vector) for vector in vectors)  # no NaN
     metadata = provider.metadata()
     assert metadata.model_name == "sentence-transformers/all-MiniLM-L6-v2"
-    assert metadata.device in ("cpu", "cuda")
+    assert metadata.device == "cpu"
 
 
 def test_semantically_related_exceeds_unrelated() -> None:

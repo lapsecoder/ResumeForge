@@ -6,13 +6,23 @@ CPU-capable setup.
 """
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-#: Default local model. Small, established, Apache-2.0, no API key, ~90 MB
-#: (fp32) on first download; held in the machine's Hugging Face cache.
+#: Model identity reported in metadata. The weights run from the bundled ONNX
+#: artifact in ``models/`` below — nothing is downloaded at runtime.
 DEFAULT_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+
+#: Bundled ONNX + tokenizer artifacts shipped inside this package.
+MODEL_DIR = Path(__file__).resolve().parent / "models"
+MODEL_FILENAME = "model_qint8_avx512_vnni.onnx"
+TOKENIZER_FILENAME = "tokenizer.json"
+VOCAB_FILENAME = "vocab.txt"
+
+#: Where the embeddings actually come from (reported in API metadata).
+MODEL_SOURCE_DEFAULT = "bundled in-app model (no runtime download)"
 
 #: Embedding dimension of the default model. Overridden at runtime with the
 #: value reported by the loaded model when available.
@@ -23,7 +33,7 @@ MODEL_LICENSE = "Apache-2.0"
 
 #: Semantic implementation version — bumped when the semantic layer changes
 #: its public contract or inference behaviour.
-SEMANTIC_IMPLEMENTATION_VERSION = "1.0"
+SEMANTIC_IMPLEMENTATION_VERSION = "2.0"
 
 
 class SemanticSettings(BaseSettings):

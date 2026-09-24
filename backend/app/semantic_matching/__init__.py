@@ -1,8 +1,8 @@
 """Local semantic embedding layer for resume <-> job matching (Phase 5B).
 
 Transient only: nothing computed here is persisted, and no external service
-is contacted. Embeddings come from a local sentence-encoder model whose
-weights live in the machine's Hugging Face cache.
+is contacted. Embeddings come from a bundled ONNX sentence-encoder model that
+ships inside this package.
 """
 
 from app.semantic_matching.schemas import SemanticMatchResult

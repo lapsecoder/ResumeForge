@@ -1,14 +1,16 @@
-"""Provider tests using a fake sentence-transformer class.
+"""Provider tests using fake ONNX session and tokenizer classes.
 
-No real model library is imported or downloaded: ``_get_st_class`` is
-monkeypatched. The only real call happens in one test asserting the pure CPU
-fallback path on this machine (no torch installed here).
+No real model library is imported or downloaded: ``_get_session_class`` and
+``_get_tokenizer_class`` are monkeypatched. The only real call happens in one
+test asserting the CPU selection path on this machine.
 """
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
+from app.semantic_matching.config import MODEL_SOURCE_DEFAULT
 from app.semantic_matching.model import (
     InferenceError,
     LocalSentenceTransformerProvider,
@@ -18,35 +20,66 @@ from app.semantic_matching.model import (
 )
 
 
-class FakeSentenceTransformer:
+class _FakeEncoding:
+    def __init__(self, text: str) -> None:
+        self.ids = [1] if text else [0]
+        self.attention_mask = [1] if text else [0]
+
+
+class FakeTokenizer:
+    from_file_calls = 0
+
+    @classmethod
+    def from_file(cls, path: str) -> "_FakeTokenizerInstance":
+        cls.from_file_calls += 1
+        return _FakeTokenizerInstance()
+
+
+class _FakeTokenizerInstance:
+    def encode_batch(self, texts: list[str]) -> list[_FakeEncoding]:
+        return [_FakeEncoding(text) for text in texts]
+
+
+class _NodeArg:
+    def __init__(self, shape: list) -> None:
+        self.shape = shape
+
+
+class FakeSession:
     instances = 0
-    encode_calls = 0
+    run_calls = 0
 
-    def __init__(self, model_name: str, device: str | None = None) -> None:
-        FakeSentenceTransformer.instances += 1
-        self.model_name = model_name
-        self.device = device
+    def __init__(self, model_path: str, providers: list[str] | None = None) -> None:
+        FakeSession.instances += 1
 
-    def get_sentence_embedding_dimension(self) -> int:
-        return 2
+    def get_outputs(self) -> list[_NodeArg]:
+        return [_NodeArg(["batch", "seq", 2])]
 
-    def encode(self, sentences, batch_size: int | None = None):
-        FakeSentenceTransformer.encode_calls += 1
-        return [[1.0, 0.0] if sentence else [0.0, 0.0] for sentence in sentences]
+    def run(self, output_names: list[str] | None, input_feed: dict) -> list[np.ndarray]:
+        FakeSession.run_calls += 1
+        ids = input_feed["input_ids"]
+        batch, seq = int(ids.shape[0]), int(ids.shape[1])
+        hidden = np.zeros((batch, seq, 2), dtype=np.float32)
+        hidden[..., 0] = 1.0
+        return [hidden]
 
 
 @pytest.fixture(autouse=True)
-def _patch_st_class(monkeypatch: pytest.MonkeyPatch) -> None:
+def _patch_model_classes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        LocalSentenceTransformerProvider, "_get_session_class", lambda self: FakeSession
+    )
     monkeypatch.setattr(
         LocalSentenceTransformerProvider,
-        "_get_st_class",
-        lambda self: FakeSentenceTransformer,
+        "_get_tokenizer_class",
+        lambda self: FakeTokenizer,
     )
     monkeypatch.setattr(
         LocalSentenceTransformerProvider, "_select_device", lambda self: "cpu"
     )
-    FakeSentenceTransformer.instances = 0
-    FakeSentenceTransformer.encode_calls = 0
+    FakeSession.instances = 0
+    FakeSession.run_calls = 0
+    FakeTokenizer.from_file_calls = 0
     yield
     reset_embedding_provider()
 
@@ -54,27 +87,27 @@ def _patch_st_class(monkeypatch: pytest.MonkeyPatch) -> None:
 class TestLazyLoading:
     def test_construction_does_not_load_model(self) -> None:
         provider = LocalSentenceTransformerProvider()
-        assert provider._model is None
-        assert FakeSentenceTransformer.instances == 0
+        assert provider._session is None
+        assert FakeSession.instances == 0
 
     def test_first_embedding_loads_exactly_once(self) -> None:
         provider = LocalSentenceTransformerProvider()
         provider.embed_texts(["hello"])
-        assert FakeSentenceTransformer.instances == 1
-        assert provider._model is not None
+        assert FakeSession.instances == 1
+        assert provider._session is not None
 
     def test_model_is_reused_across_embedding_calls(self) -> None:
         provider = LocalSentenceTransformerProvider()
         provider.embed_texts(["one"])
         provider.embed_texts(["two"])
-        assert FakeSentenceTransformer.instances == 1
-        assert FakeSentenceTransformer.encode_calls == 2
+        assert FakeSession.instances == 1
+        assert FakeSession.run_calls == 2
 
     def test_importing_module_does_not_load_model(self) -> None:
         from app import semantic_matching  # noqa: PLC0415
 
         assert semantic_matching is not None
-        assert FakeSentenceTransformer.instances == 0
+        assert FakeSession.instances == 0
 
 
 class TestEmbeddingBehaviour:
@@ -99,7 +132,7 @@ class TestEmbeddingBehaviour:
         provider = LocalSentenceTransformerProvider()
         metadata = provider.metadata()
         assert metadata.model_name.startswith("sentence-transformers/")
-        assert metadata.source == "local Hugging Face cache"
+        assert metadata.source == MODEL_SOURCE_DEFAULT
         assert metadata.license == "Apache-2.0"
 
 
@@ -108,9 +141,11 @@ class TestErrorHandling:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         def _missing(*args, **kwargs):
-            raise ImportError("no sentence_transformers module")
+            raise ImportError("no onnxruntime module")
 
-        monkeypatch.setattr(LocalSentenceTransformerProvider, "_get_st_class", _missing)
+        monkeypatch.setattr(
+            LocalSentenceTransformerProvider, "_get_session_class", _missing
+        )
         provider = LocalSentenceTransformerProvider()
         with pytest.raises(ModelLoadError):
             provider.embed_texts(["x"])
@@ -118,22 +153,25 @@ class TestErrorHandling:
     def test_inference_failure_raises_inference_error(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        class BrokenSentenceTransformer(FakeSentenceTransformer):
-            def encode(self, sentences, batch_size: int | None = None):
+        class BrokenSession:
+            def __init__(self, model_path: str, providers=None) -> None:
+                pass
+
+            def run(self, output_names, input_feed):
                 raise RuntimeError("boom")
 
         monkeypatch.setattr(
             LocalSentenceTransformerProvider,
-            "_get_st_class",
-            lambda self: BrokenSentenceTransformer,
+            "_get_session_class",
+            lambda self: BrokenSession,
         )
         provider = LocalSentenceTransformerProvider()
         with pytest.raises(InferenceError):
             provider.embed_texts(["x"])
 
 
-class TestRealCpuFallback:
-    def test_no_torch_machine_selects_cpu(self) -> None:
+class TestDeviceSelection:
+    def test_onnx_runtime_selects_cpu(self) -> None:
         provider = LocalSentenceTransformerProvider()
         assert provider._select_device() == "cpu"
 

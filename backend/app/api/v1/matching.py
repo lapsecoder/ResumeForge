@@ -97,7 +97,8 @@ async def semantic_matching(body: MatchRequestBody) -> JSONResponse:
             503,
             "semantic_model_unavailable",
             "The local semantic model is unavailable. "
-            "Install sentence-transformers to enable semantic matching.",
+            "Reinstall dependencies with `pip install onnxruntime tokenizers` "
+            "to enable semantic matching.",
         )
     except SemanticError:
         logger.warning("Semantic matching failed")

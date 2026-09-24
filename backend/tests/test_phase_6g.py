@@ -20,8 +20,11 @@ from fastapi.testclient import TestClient
 
 from app.hybrid_matching.schemas import HYBRID_LABEL, HYBRID_MODEL_DISCLOSURE
 from app.main import app
-from app.semantic_matching.config import SEMANTIC_IMPLEMENTATION_VERSION
 from app.semantic_matching import service as semantic_service
+from app.semantic_matching.config import (
+    MODEL_SOURCE_DEFAULT,
+    SEMANTIC_IMPLEMENTATION_VERSION,
+)
 from app.semantic_matching.model import (
     ModelLoadError,
     ModelMetadata,
@@ -99,7 +102,7 @@ class TestModelVersioningMetadata:
         assert metadata["model_name"] == "sentence-transformers/all-MiniLM-L6-v2"
         assert metadata["model_version"] == metadata["model_name"]
         assert metadata["implementation_version"] == SEMANTIC_IMPLEMENTATION_VERSION
-        assert metadata["model_source"] == "local Hugging Face cache"
+        assert metadata["model_source"] == MODEL_SOURCE_DEFAULT
         assert metadata["model_license"] == "Apache-2.0"
         assert metadata["model_dimension"] == 2
 
@@ -114,9 +117,11 @@ class TestModelVersioningMetadata:
 
     def test_empty_result_metadata_still_versioned(self) -> None:
         # No comparable content on either side should still expose model facts.
-        from app.semantic_matching.service import compute_semantic_match  # noqa: PLC0415
         from app.job_parsing.schemas import JobDescription, JobMetadata  # noqa: PLC0415
         from app.parsing.schemas import Resume, ResumeMetadata  # noqa: PLC0415
+        from app.semantic_matching.service import (
+            compute_semantic_match,  # noqa: PLC0415
+        )
 
         empty_resume = Resume(
             metadata=ResumeMetadata(
@@ -132,7 +137,7 @@ class TestModelVersioningMetadata:
         assert result.overall_similarity is None
         assert result.metadata.model_version == "sentence-transformers/all-MiniLM-L6-v2"
         assert result.metadata.implementation_version == SEMANTIC_IMPLEMENTATION_VERSION
-        assert result.metadata.model_source == "local Hugging Face cache"
+        assert result.metadata.model_source == MODEL_SOURCE_DEFAULT
         assert result.metadata.model_license == "Apache-2.0"
 
 
